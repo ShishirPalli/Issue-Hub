@@ -11,7 +11,8 @@ const {
   addClarification,
   getClarifications,
 } = require('../controllers/complaintController');
-const { authenticate, authorize } = require('../middleware/auth');
+const authenticate = require('../middleware/authenticate');
+const authorize = require('../middleware/authorize');
 
 const router = express.Router();
 router.use(authenticate);
