@@ -23,6 +23,8 @@ const auditLogSchema = new Schema(
       index: true,
       enum: [
         'COMPLAINT_CREATED',
+        'COMPLAINT_SAVED',
+        'COMPLAINT_UPDATED',
         'STATUS_UPDATED',
         'CLARIFICATION_POSTED',
         'PROOF_OF_FIX_UPLOADED',
