@@ -1,5 +1,10 @@
+feature/auth-member1
 # Environment variables
 .env
 
 # Dependencies
 node_modules/
+node_modules/
+.env
+.DS_Store
+ main
