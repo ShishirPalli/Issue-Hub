@@ -1,10 +1,10 @@
 const mongoose = require('mongoose');
 
 const connectDatabase = async () => {
-  const mongoUri = process.env.MONGODB_URI;
+  const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
 
   if (!mongoUri) {
-    const error = new Error('MONGODB_URI is not configured.');
+    const error = new Error('MONGODB_URI or MONGO_URI is not configured.');
     console.error('[IssueHub] Database configuration error:', error.message);
     throw error;
   }
