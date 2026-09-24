@@ -154,6 +154,11 @@ const complaintSchema = new Schema(
       trim: true,
       maxlength: 200,
     },
+    subject: {
+      type: String,
+      trim: true,
+      maxlength: 200,
+    },
     description: {
       type: String,
       required: true,
@@ -167,7 +172,10 @@ const complaintSchema = new Schema(
     },
     status: {
       type: String,
-      enum: ['submitted', 'in_progress', 'resolved', 'closed', 'withdrawn'],
+      enum: [
+        'submitted', 'in_progress', 'resolved', 'closed', 'withdrawn',
+        'Open', 'In Progress', 'Resolved', 'Closed',
+      ],
       default: 'submitted',
       index: true,
     },
@@ -175,10 +183,33 @@ const complaintSchema = new Schema(
       type: [clarificationThreadSchema],
       default: [],
     },
+    clarificationThread: {
+      type: [clarificationThreadSchema],
+      default: [],
+    },
     resolutionConfirmation: {
       type: resolutionConfirmationSchema,
       default: () => ({}),
     },
+    resolution: {
+      type: new Schema(
+        {
+          submittedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+          text: { type: String, trim: true },
+          studentConfirmed: Boolean,
+          studentFeedback: String,
+          confirmedAt: Date,
+        },
+        { _id: false },
+      ),
+      default: null,
+    },
+    isWithdrawn: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    withdrawnAt: Date,
     // Member 3 (Prioritization and deduplication)
     priorityMetrics: {
       type: priorityMetricsSchema,
@@ -255,6 +286,23 @@ complaintSchema.set('toJSON', {
 complaintSchema.index({ status: 1, category: 1 });
 complaintSchema.index({ 'priorityMetrics.calculatedScore': -1, upvoteCount: -1 });
 complaintSchema.index({ title: 'text', description: 'text' });
+
+const STATUS_TRANSITIONS = {
+  Open: ['In Progress'],
+  'In Progress': ['Resolved'],
+  Resolved: ['Closed', 'In Progress'],
+  Closed: [],
+  submitted: ['in_progress', 'withdrawn', 'In Progress'],
+  in_progress: ['resolved', 'withdrawn', 'Resolved'],
+  resolved: ['closed', 'in_progress', 'Closed', 'In Progress'],
+  closed: [],
+  withdrawn: [],
+};
+
+complaintSchema.statics.STATUS_TRANSITIONS = STATUS_TRANSITIONS;
+complaintSchema.statics.canTransition = (currentStatus, nextStatus) => (
+  STATUS_TRANSITIONS[currentStatus]?.includes(nextStatus) || false
+);
 
 complaintSchema.pre('save', function syncUpvoteCount(next) {
   this.upvoteCount = this.upvotes.length;
