@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const AuditLog = require('./AuditLog');
 
 const { Schema } = mongoose;
 
@@ -81,6 +82,8 @@ const priorityMetricsSchema = new Schema(
 const proofOfFixSchema = new Schema(
   {
     // Member 4 (Security and proof of fix)
+    imageUrl: String,
+    description: String,
     notes: String,
     mediaUrls: {
       type: [String],
@@ -225,22 +228,29 @@ const complaintSchema = new Schema(
       default: null,
     },
   },
-  {
-    toJSON: {
-      virtuals: true,
-      transform: (_document, returnedObject, options) => {
-        if (returnedObject.isSensitive && !options.includeSensitiveComplainant) {
-          returnedObject.submittedBy = {
-            name: 'Anonymous Student',
-            isRedacted: true,
-          };
-        }
-        delete returnedObject.__v;
-        return returnedObject;
-      },
-    },
-  },
 );
+
+complaintSchema.set('toJSON', {
+  virtuals: true,
+  transform: (document, returnedObject, options) => {
+    const user = options.user;
+    const isPrivileged = user
+      && ['grievance_officer', 'admin'].includes(user.role);
+    const isStudent = user
+      && user._id
+      && document.submittedBy
+      && user._id.toString() === document.submittedBy.toString();
+
+    if (document.isSensitive && !isPrivileged && !isStudent) {
+      returnedObject.description = '[REDACTED: SENSITIVE GRIEVANCE]';
+      delete returnedObject.student;
+      delete returnedObject.submittedBy;
+    }
+
+    delete returnedObject.__v;
+    return returnedObject;
+  },
+});
 
 complaintSchema.index({ status: 1, category: 1 });
 complaintSchema.index({ 'priorityMetrics.calculatedScore': -1, upvoteCount: -1 });
@@ -249,6 +259,29 @@ complaintSchema.index({ title: 'text', description: 'text' });
 complaintSchema.pre('save', function syncUpvoteCount(next) {
   this.upvoteCount = this.upvotes.length;
   next();
+});
+
+// Member 4 (Security audit trail)
+complaintSchema.post('save', async (document) => {
+  await AuditLog.create({
+    complaintId: document._id,
+    performedBy: document.submittedBy,
+    action: 'COMPLAINT_SAVED',
+    newState: document.toObject(),
+  });
+});
+
+complaintSchema.post('findOneAndUpdate', async (document) => {
+  if (!document) {
+    return;
+  }
+
+  await AuditLog.create({
+    complaintId: document._id,
+    performedBy: document.submittedBy,
+    action: 'COMPLAINT_UPDATED',
+    newState: document.toObject(),
+  });
 });
 
 module.exports = mongoose.model('Complaint', complaintSchema);
