@@ -4,18 +4,47 @@ const bcrypt = require('bcrypt');
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
-    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    password: { type: String, required: true, minlength: 6, select: false },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+      match: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+      index: true,
+    },
+    password: { type: String, required: true, minlength: 8, select: false },
     role: {
       type: String,
-      enum: ['USER', 'STAFF', 'DEPT_ADMIN', 'GRIEVANCE_OFFICER', 'SUPER_ADMIN'],
-      default: 'USER',
+      enum: ['student', 'admin', 'grievance_officer'],
+      default: 'student',
+      index: true,
     },
-    department: { type: String, default: null },
-    activeComplaintCount: { type: Number, default: 0 },
+    department: { type: String, trim: true, default: null },
+    isActive: { type: Boolean, default: true },
     refreshToken: { type: String, select: false },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    toJSON: {
+      virtuals: true,
+      transform: (_document, returnedObject) => {
+        delete returnedObject.password;
+        delete returnedObject.refreshToken;
+        delete returnedObject.__v;
+        return returnedObject;
+      },
+    },
+    toObject: {
+      virtuals: true,
+      transform: (_document, returnedObject) => {
+        delete returnedObject.password;
+        delete returnedObject.refreshToken;
+        delete returnedObject.__v;
+        return returnedObject;
+      },
+    },
+  },
 );
 
 userSchema.pre('save', async function () {
